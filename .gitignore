@@ -1,0 +1,27 @@
+# Git ignore for my thesis project
+
+
+#########################################################################
+############## IGNORE all unnecessary CARLA related files ###############
+#########################################################################
+
+CarlaUE4.sh
+CarlaUE4/
+Engine/
+Example.CarlaSettings.ini
+PythonClient/MANIFEST.in
+PythonClient/carla/
+PythonClient/client_example.py
+PythonClient/driving_benchmark_example.py
+PythonClient/manual_control.py
+PythonClient/point_cloud_example.py
+PythonClient/requirements.txt
+PythonClient/setup.py
+PythonClient/test/
+PythonClient/view_start_positions.py
+core
+
+
+
+_benchmark_results/**/imgs/
+
