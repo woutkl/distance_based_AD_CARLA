@@ -7,8 +7,11 @@ SCNDS=$2
 TOWN=TOWN2
 APPEND=false
 APPEND=$3
+PEDESTRIANS=$4
+VEHICLES=$5
 
-BASEDIR=_benchmark_results/${TOWN}/${SCNDS}s
+
+BASEDIR=../_benchmark_results/${TOWN}/${SCNDS}s_${PEDESTRIANS}p${VEHICLES}v
 
 # Check if the directory exists, if not create one
 if [ ! -d $BASEDIR ]; then
@@ -45,6 +48,6 @@ do
     do
         echo Iteration $i
         PATHITER=$BASEDIR/${fpm}fpm/imgs/it${i}
-        python3 distance_based_autopilot.py -i -q Low --fpm ${fpm} -s ${SCNDS} --savepath ${PATHITER}
+        python3 distance_based_autopilot.py -i -q Low --fpm ${fpm} -s ${SCNDS} --savepath ${PATHITER} -p 200 -v 0
     done
 done

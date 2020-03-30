@@ -29,8 +29,8 @@ def run_carla_client(args):
     number_of_episodes = 1
     frames_per_episode = 60*args.seconds # Which means simulation time of 60s
     # Number of frames to be processed per meter
-    nr_pedestrians = [0, 30, 65, 100, 200]
-    nr_vehicles = [0, 20, 40, 80, 150]
+    #nr_pedestrians = [0, 30, 65, 100, 200]
+    #nr_vehicles = [0, 20, 40, 80, 150]
 
     # We assume the CARLA server is already waiting for a client to connect at
     # host:port. To create a connection we can use the `make_carla_client`
@@ -48,7 +48,7 @@ def run_carla_client(args):
             # Initialize environment settings
             if args.settings_filepath is None:
                 # Create the carla settings programmatically
-                settings = make_carla_settings(args, nr_vehicles[0], nr_pedestrians[4])
+                settings = make_carla_settings(args)
             else:
                 # Alternatively, we can load these settings from a file.
                 with open(args.settings_filepath, 'r') as fp:
@@ -136,15 +136,15 @@ def run_carla_client(args):
                 collision_damage = pm.collision_vehicles + pm.collision_pedestrians + pm.collision_other
                 benchmark_writer.writerow([collision_damage, otherlane_metric, offroad_metric, measurements.game_timestamp-1003, distance, frame+1-60])
 
-def make_carla_settings(args, nrOfV, nrOfP):
+def make_carla_settings(args):
     # Create a CarlaSettings object. This object is a wrapper around
     # the CarlaSettings.ini file.
     settings = CarlaSettings()
     settings.set(
         SynchronousMode=True,
         SendNonPlayerAgentsInfo=True,
-        NumberOfVehicles=nrOfV,
-        NumberOfPedestrians=nrOfP,
+        NumberOfVehicles=args.vehicles,
+        NumberOfPedestrians=args.pedestrians,
         WeatherId=random.choice([1, 3, 7, 8, 14]),
         QualityLevel=args.quality_level)
     settings.randomize_seeds()
@@ -190,13 +190,6 @@ def main():
         metavar='H',
         default='localhost',
         help='IP of the host server (default: localhost)')
-    # Option to set the port number
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
     # Option to enable quality switching
     argparser.add_argument(
         '-q', '--quality-level',
@@ -227,11 +220,19 @@ def main():
         metavar='P',
         default=None,
         help='Path to the save destination')
+    argparser.add_argument(
+        '-p', '--pedestrians',
+        type=int,
+        help='Number of pedestrians to use in the simulator')
+    argparser.add_argument(
+        '-v', '--vehicles',
+        type=int,
+        help='Number of vehicles to use in the simulator')
 
     args = argparser.parse_args()
 
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
+    args.port=2000
     args.out_filename_format = args.savepath+'/{:0>6d}'
     print(args.out_filename_format)
 
