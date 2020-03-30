@@ -29,7 +29,6 @@ def run_carla_client(args):
     number_of_episodes = 1
     frames_per_episode = 60*args.seconds # Which means simulation time of 60s
     # Number of frames to be processed per meter
-    fpm = args.fpm
     nr_pedestrians = [0, 30, 65, 100, 200]
     nr_vehicles = [0, 20, 40, 80, 150]
 
@@ -74,12 +73,9 @@ def run_carla_client(args):
             control = None
             previous_loc = scene.player_start_spots[player_start].location
             distance = -1.19 # Due to the falling of the vehicle in the start
-            distance_step = -1.19 # Due to the falling of the vehicle in the start
-            previous_update_time = 10 # To make sure that once the vehicle is started, an update is sent
 
             offroad_metric = 0
             otherlane_metric = 0
-            fpm_frames = 0
 
             first_collision = False
 
@@ -107,12 +103,9 @@ def run_carla_client(args):
                 ddelta= np.linalg.norm(np.array((previous_loc.x, previous_loc.y, \
                      previous_loc.z)) - np.array((current_loc.x, current_loc.y, current_loc.z)))
                 distance += ddelta
-                distance_step += ddelta
                 print(distance)
-                print(distance_step)
                 print(current_loc)
                 previous_loc = current_loc
-                current_time = measurements.game_timestamp
                 offroad_metric += measurements.player_measurements.intersection_offroad
                 otherlane_metric += measurements.player_measurements.intersection_otherlane
                 
@@ -121,7 +114,7 @@ def run_carla_client(args):
                 if pm.collision_vehicles > 0 or pm.collision_pedestrians > 0 or pm.collision_other > 0:
                     if args.save_images_to_disk:
                         for name, measurement in sensor_data.items():
-                            filename = args.out_filename_format.format(fpm_frames, frame)
+                            filename = args.out_filename_format.format(frame)
                             measurement.save_to_disk(filename)
                     break
 
@@ -130,41 +123,18 @@ def run_carla_client(args):
                 # If we are in synchronous mode the server will pause the
                 # simulation until we send this control.
 
-                # Check if the frame should actually be used to control the vehicle
-                # Because a default fps should be assigned in the beginning and we need fpm
-                if distance_step>=1/fpm:
-                    # The frame should be used to control the vehicle
-                    # because the distance step is reached
-                    control = measurements.player_measurements.autopilot_control
-                    control.steer += random.uniform(-0.1, 0.1)
-                    distance_step -= 1/fpm
-                    print("Distance Reduced: " + str(distance_step) + "\n")
-                    previous_update_time = current_time
-                    fpm_frames += 1
-                    # Save the images to disk if requested.
-                    if args.save_images_to_disk:
-                        for name, measurement in sensor_data.items():
-                            filename = args.out_filename_format.format(fpm_frames, frame)
-                            measurement.save_to_disk(filename)
-                # If the distance step isn't reached after 1 second than do another update
-                elif previous_update_time + 1000 < current_time :
-                    previous_update_time = current_time
-                    control = measurements.player_measurements.autopilot_control
-                    control.steer += random.uniform(-0.1, 0.1)
-                    print("Extra update, too slow!")
-                    fpm_frames +=1
-                    # Save the images to disk if requested.
-                    if args.save_images_to_disk:
-                        for name, measurement in sensor_data.items():
-                            filename = args.out_filename_format.format(fpm_frames, frame)
-                            measurement.save_to_disk(filename)
-
+                control = measurements.player_measurements.autopilot_control
+                control.steer += random.uniform(-0.1, 0.1)
+                if args.save_images_to_disk:
+                    for name, measurement in sensor_data.items():
+                        filename = args.out_filename_format.format(frame)
+                        measurement.save_to_disk(filename)
                 client.send_control(control)
 
             with open(args.savepath.split("imgs")[0]+'/results.csv', mode='a') as benchmark:
                 benchmark_writer = csv.writer(benchmark, delimiter=';')
                 collision_damage = pm.collision_vehicles + pm.collision_pedestrians + pm.collision_other
-                benchmark_writer.writerow([collision_damage, otherlane_metric, offroad_metric, measurements.game_timestamp-1003, distance, frame+1-60, fpm_frames])
+                benchmark_writer.writerow([collision_damage, otherlane_metric, offroad_metric, measurements.game_timestamp-1003, distance, frame+1-60])
 
 def make_carla_settings(args, nrOfV, nrOfP):
     # Create a CarlaSettings object. This object is a wrapper around
@@ -247,12 +217,6 @@ def main():
         default=None,
         help='Path to a "CarlaSettings.ini" file')
     argparser.add_argument(
-        '--fpm',
-        metavar='F',
-        type=float,
-        default=2,
-        help='Number of frames to analyze per meter')
-    argparser.add_argument(
         '-s', '--seconds',
         metavar='S',
         default='60',
@@ -268,8 +232,8 @@ def main():
 
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    args.out_filename_format = args.savepath+'/{:0>6d}_{:0>6d}'
-
+    args.out_filename_format = args.savepath+'/{:0>6d}'
+    print(args.out_filename_format)
 
     while True:
         try:

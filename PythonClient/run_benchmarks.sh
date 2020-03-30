@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
-fpm_options=(2.4 2.2 2.0 1.8 1.6 1.4 1.2 1.0)
-
+#fpm_options=(2.4 2.2 2.0 1.8 1.6 1.4 1.2 1.0)
+fpm_options=(2.0 1.8 1.6 1.4 1.2 1.0)
 ITERS=$1
 SCNDS=$2
 TOWN=TOWN2
+APPEND=false
+APPEND=$3
 
 BASEDIR=_benchmark_results/${TOWN}/${SCNDS}s
 
@@ -17,8 +19,10 @@ fi
 for fpm in ${fpm_options[@]}
 do
     if [ -d ${BASEDIR}/${fpm}fpm ]; then
-        echo "ERROR: one of the experiments is already done, can not override!"
-        exit 1
+        if [ "$APPEND" = false ]; then
+            echo "ERROR: one of the experiments is already done, can not override!"
+            exit 1
+        fi
     fi
 done
 
@@ -29,8 +33,15 @@ for fpm in ${fpm_options[@]}
 do
     echo Frames Per Meter: $fpm
     mkdir $BASEDIR/${fpm}fpm $BASEDIR/${fpm}fpm/imgs
-    echo ${COLUMN_NAMES} >> ${BASEDIR}/${fpm}fpm/results.csv
-    for i in $(seq 1 $ITERS) 
+    if [ ! -f ${BASEDIR}/${fpm}fpm/results.csv ]; then
+        echo ${COLUMN_NAMES} >> ${BASEDIR}/${fpm}fpm/results.csv
+    fi
+    start=1
+    if [ "$APPEND" = true  ]; then
+        start=`cat $BASEDIR/${fpm}fpm/results.csv | wc -l`
+    fi
+    echo $start
+    for i in $(seq ${start} $ITERS) 
     do
         echo Iteration $i
         PATHITER=$BASEDIR/${fpm}fpm/imgs/it${i}
