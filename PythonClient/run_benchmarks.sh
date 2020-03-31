@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#fpm_options=(2.4 2.2 2.0 1.8 1.6 1.4 1.2 1.0)
+#fpm_options=(2.4 2.2 2.0 1.8 1.6 1.4 1.2 1.0 0.8 0.6)
 fpm_options=(2.0 1.8 1.6 1.4 1.2 1.0)
 ITERS=$1
 SCNDS=$2
