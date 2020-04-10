@@ -4,12 +4,13 @@
 fpm_options=(0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4)
 ITERS=$1
 SCNDS=$2
-TOWN=TOWN2
+TOWN=TOWN$7
 APPEND=false
 APPEND=$3
 PEDESTRIANS=$4
 VEHICLES=$5
-
+PORT=2000
+PORT=$6
 
 BASEDIR=../_benchmark_results/${TOWN}/${SCNDS}s_${PEDESTRIANS}p${VEHICLES}v
 
@@ -48,6 +49,6 @@ do
     do
         echo Iteration $i
         PATHITER=$BASEDIR/${fpm}fpm/imgs/it${i}
-        python3 distance_based_autopilot.py -i -q Low --fpm ${fpm} -s ${SCNDS} --savepath ${PATHITER} -p 200 -v 0
+        python3 distance_based_autopilot.py -q Low --fpm ${fpm} -s ${SCNDS} --savepath ${PATHITER} -p 200 -v 0 --port ${PORT}
     done
 done

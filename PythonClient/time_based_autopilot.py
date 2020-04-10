@@ -186,6 +186,12 @@ def main():
     argparser = argparse.ArgumentParser(description=__doc__)
     # Option to set the host IP address
     argparser.add_argument(
+        '--port',
+        metavar='P',
+        default=2000,
+        type=int,
+        help='TCP port to listen to (default: 2000)')
+    argparser.add_argument(
         '--host',
         metavar='H',
         default='localhost',
@@ -217,7 +223,6 @@ def main():
         help='Simulation duration in seconds')
     argparser.add_argument(
         '--savepath',
-        metavar='P',
         default=None,
         help='Path to the save destination')
     argparser.add_argument(
@@ -232,7 +237,6 @@ def main():
     args = argparser.parse_args()
 
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    args.port=2000
     args.out_filename_format = args.savepath+'/{:0>6d}'
     print(args.out_filename_format)
 
