@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #fpm_options=(2.4 2.2 2.0 1.8 1.6 1.4 1.2 1.0 0.8 0.6)
-fpm_options=(0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4)
+fpm_options=(0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2 2.4)
 ITERS=$1
 SCNDS=$2
 TOWN=TOWN$7
