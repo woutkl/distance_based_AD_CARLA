@@ -27,7 +27,7 @@ from carla.agent import ForwardAgent
 def run_carla_client(args):
     # Here we will run 1 episode with 3600 frames each.
     number_of_episodes = 1
-    frames_per_episode = 60*args.seconds # Which means simulation time of 60s
+    frames_per_episode = args.fps*args.seconds # Which means simulation time of 60s
     # Number of frames to be processed per meter
     #nr_pedestrians = [0, 30, 65, 100, 200]
     #nr_vehicles = [0, 20, 40, 80, 150]
@@ -73,7 +73,7 @@ def run_carla_client(args):
             control = None
             previous_loc = scene.player_start_spots[player_start].location
             distance = -1.19 # Due to the falling of the vehicle in the start
-
+            factor = 60/args.fps
             offroad_metric = 0
             otherlane_metric = 0
 
@@ -86,7 +86,7 @@ def run_carla_client(args):
                 measurements, sensor_data = client.read_data()
                 print(frame)
                 # Don't analyze the first second
-                if measurements.game_timestamp < 1004:
+                if measurements.game_timestamp < 1004/factor:
                     control = VehicleControl()
                     control.throttle = 0.9
                     client.send_control(control)
@@ -134,7 +134,7 @@ def run_carla_client(args):
             with open(args.savepath.split("imgs")[0]+'/results.csv', mode='a') as benchmark:
                 benchmark_writer = csv.writer(benchmark, delimiter=';')
                 collision_damage = pm.collision_vehicles + pm.collision_pedestrians + pm.collision_other
-                benchmark_writer.writerow([collision_damage, otherlane_metric, offroad_metric, measurements.game_timestamp-1003, distance, frame+1-60])
+                benchmark_writer.writerow([collision_damage, otherlane_metric, offroad_metric, measurements.game_timestamp-1004/factor, distance, frame+1-args.fps])
 
 def make_carla_settings(args):
     # Create a CarlaSettings object. This object is a wrapper around
@@ -233,6 +233,11 @@ def main():
         '-v', '--vehicles',
         type=int,
         help='Number of vehicles to use in the simulator')
+    argparser.add_argument(
+        '--fps',
+        type=int,
+        help='Number of frames per second')
+
 
     args = argparser.parse_args()
 

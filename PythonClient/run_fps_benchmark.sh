@@ -2,12 +2,16 @@
 
 ITERS=$1
 SCNDS=$2
-TOWN=TOWN2
-fps=60
+TOWN=TOWN$7
+fps=30
 APPEND=false
 APPEND=$3
 PEDESTRIANS=$4
 VEHICLES=$5
+PORT=2000
+PORT=$6
+
+
 BASEDIR=../_benchmark_results/${TOWN}/${SCNDS}s_${PEDESTRIANS}p${VEHICLES}v
 
 # Check if the directory exists, if not create one
@@ -40,6 +44,6 @@ for i in $(seq ${start} $ITERS)
 do
     echo Iteration $i
     PATHITER=$BASEDIR/${fps}fps/imgs/it${i}
-    python3 time_based_autopilot.py -i -q Low -s ${SCNDS} --savepath ${PATHITER} -p 200 -v 0
+    python3 time_based_autopilot.py -q Low -s ${SCNDS} --fps ${fps} --savepath ${PATHITER} -p 200 -v 0 --port ${PORT}
 done
 
