@@ -33,7 +33,7 @@ COLUMN_NAMES="Collision damage;Offroad metric;Other lane metric;Total game time;
 echo Frames Per Second: $fps
 mkdir $BASEDIR/${fps}fps $BASEDIR/${fps}fps/imgs
 if [ ! -f ${BASEDIR}/${fps}fps/results.csv ]; then
-    echo ${COLUMN_NAMES} >> ${BASEDIR}/${fpm}fpm/results.csv
+    echo ${COLUMN_NAMES} >> ${BASEDIR}/${fps}fps/results.csv
 fi
 start=1
 if [ "$APPEND" = true  ]; then
