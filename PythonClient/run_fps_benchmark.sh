@@ -44,6 +44,6 @@ for i in $(seq ${start} $ITERS)
 do
     echo Iteration $i
     PATHITER=$BASEDIR/${fps}fps/imgs/it${i}
-    python3 time_based_autopilot.py -q Low -s ${SCNDS} --fps ${fps} --savepath ${PATHITER} -p 200 -v 0 --port ${PORT}
+    python3 time_based_autopilot.py -q Low -s ${SCNDS} -i --fps ${fps} --savepath ${PATHITER} -p 200 -v 0 --port ${PORT}
 done
 

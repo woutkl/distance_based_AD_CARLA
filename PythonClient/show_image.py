@@ -25,7 +25,7 @@ def main():
         help='Path of the image to show.')
     
     args = argparser.parse_args()
-    
+    print(args.imagepath)    
     show_image(args)
 
 
