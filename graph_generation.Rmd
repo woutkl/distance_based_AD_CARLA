@@ -1,0 +1,299 @@
+---
+title: "thesis_graph_generation"
+author: "Klingele Wout"
+date: "3/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(Rmisc)
+library(reshape2)
+# Set the theme of the plots
+theme_set(theme_minimal() + theme(axis.line = element_line(colour = "black")))
+```
+
+# R Markdown file to generate all the necessary plots for my dissertation.
+
+```{r}
+# Function to load in the necessary .csv files into appropriate r dataframes.
+update_benchmarks <- function(TOWN, frame_rate){
+  # BASE directory
+  base_dir <- paste("_benchmark_results/TOWN",TOWN,"/1800s_200p0v/", sep="")
+  # Save all the files as a list
+  fpm_files <- list.files(path=base_dir, pattern=paste("*",frame_rate,sep=""), full.names=FALSE, include.dirs=TRUE)
+  # Create an empty dataframe with all the necessary columns
+  summary.df <- data.frame(fpm=numeric(0), distance=numeric(0), game_time=numeric(0), offroad=numeric(0),
+                            perc_finished=numeric(0), other_lane=numeric(0), other_and_off=numeric(0),
+                           frames=numeric(0), distanceCIL=numeric(0), distanceCIU=numeric(0), collision_damage=numeric(0), damageCIL=numeric(0), damageCIU=numeric(0), gametimeCIL=numeric(0), gametimeCIU=numeric(0), otherandoffroadCIL=numeric(0), otherandoffroadCIU=numeric(0), successfulCIL=numeric(0),successfulCIU=numeric(0), nonnormalisedOffroad=numeric(0), nonnormalisedOffroadCIL=numeric(0), nonnormalisedOffroadCIU=numeric(0)
+                           )
+  ci<-0.8
+  benchmarks <- vector("list", length(fpm_files))
+  # Iterate over all the different frame rates
+  for(i in seq_along(fpm_files)){
+    # Convert each frame rate into a separate dataframe
+    benchmark <- read.csv(paste(base_dir, fpm_files[i], "/results.csv", sep = ""), sep=";")
+    # Get the frames whether fps or fpm is used
+    number_of_frames <- if (frame_rate == "fpm") benchmark$Number.of.frames.using.FPM...1second.updates. 
+                        else benchmark$Number.of.frames.using.FPS
+    # Calculate some confidence intervals
+    distanceCI <- CI(benchmark$Total.travelled.distance)
+    damageCI <- CI(benchmark$Collision.damage)
+    gametimeCI <- CI(benchmark$Total.game.time/1000)
+    offroadCI <- (CI(benchmark$Other.lane.metric, ci=ci) + CI(benchmark$Offroad.metric, ci=ci))/mean(benchmark$Number.of.frames.using.FPS)
+    successfulCI <- 100*CI(!benchmark$Collision.damage)
+    # Add the means of each column into the mean dataframe
+    summary.df[i,] <- c(as.numeric(sub(frame_rate,"",fpm_files[i])),
+                        distanceCI[2], 
+                        mean(benchmark$Total.game.time)/1000, 
+                        offroadCI[2],
+                        successfulCI[2],
+                        mean(benchmark$Other.lane.metric), 0,
+                        mean(number_of_frames), 
+                        distanceCI[3], distanceCI[1],
+                        mean(benchmark$Collision.damage),
+                        damageCI[3], damageCI[1],
+                        gametimeCI[3], gametimeCI[1],
+                        offroadCI[3], offroadCI[1],
+                        successfulCI[3], successfulCI[1], 
+                        offroadCI[2], offroadCI[3], offroadCI[1]
+                        ) 
+                        benchmarks[[i]] <- benchmark
+  }
+  # Normalize the offroad and other lane
+  max_offroad <- max(summary.df$offroad)
+  for(i in seq_along(fpm_files)){
+    summary.df$offroad[i] <- summary.df$offroad[i] / max_offroad
+    summary.df$otherandoffroadCIL[i] <- summary.df$otherandoffroadCIL[i] / max_offroad
+    summary.df$otherandoffroadCIU[i] <- summary.df$otherandoffroadCIU[i] / max_offroad
+  }
+  return(list(averages.df=summary.df, benchmarks=benchmarks))
+}
+
+```
+
+```{r}
+# Function to convert the power benchmark .csv files into an R dataframe
+update_power_benchmarks <- function(TOWN, frame_rate){
+  # BASE directory
+  base_dir <- paste("_benchmark_results/TOWN",TOWN,"/1800s_200p0v/", sep="")
+  # Save all the files as a list
+  fpm_files <- list.files(path=base_dir, pattern=paste("*",frame_rate,sep=""), full.names=FALSE, include.dirs=TRUE)
+  if (frame_rate == "fps"){
+    # Discard the 60 fps due to the fact that yolo can analyse frames at a maximum of 45 fps
+    fpm_files <- fpm_files[-4]
+  }
+  summary.df <- data.frame(frameRate=numeric(0), avgPower=numeric(0))
+  benchmarks <- vector("list", length(fpm_files))
+  # Iterate over the different frame rates
+  for(i in seq_along(fpm_files)){
+    # Convert the .csv file into a dataframe
+    benchmark <- read.csv(paste(base_dir, fpm_files[i], "/power_results.csv", sep = ""), sep=";")
+    # Calculate the mean and push it into the mean dataframe
+    summary.df[i,] <- c(as.numeric(sub(frame_rate,"",fpm_files[i])), mean(benchmark$AvgPower.W.))
+  }
+  return(list(powerAvgs=summary.df))
+}
+```
+
+```{r}
+# Function to create all the plots
+create_plots <- function(){
+  # Load the benchamrk .csv files
+  TOWN2 <- update_benchmarks(2, "fpm")
+  summ2 <- TOWN2$averages.df
+  benches2 <- TOWN2$benchmarks
+  fps_town2 <- update_benchmarks(2, "fps")
+  fps_town2.df <- fps_town2$averages.df
+  fps_benches <- fps_town2$benchmarks
+  bar_width <- 0.05
+  
+  TOWN1 <- update_benchmarks(1, "fpm")
+  summ1 <- TOWN1$averages.df
+  fps_town1 <- update_benchmarks(1, "fps")
+  fps_town1.df <- fps_town1$averages.df
+  total_summ <- rbind(summ1, summ2)
+  total_summ$Town <- c(rep("1", nrow(summ1)), rep("2", nrow(summ2)))
+
+  #########################################
+  ########## PERFORMANCE PLOTS ############
+  #########################################
+  
+  # Create the first plot, the average distance travelled until crash
+  p1 <- ggplot(total_summ, aes(x=fpm, y=distance, col=Town)) +
+            geom_ribbon(aes(ymin = distanceCIL, ymax = distanceCIU, fill=Town), alpha=0.3, colour = NA) +
+            geom_line() + geom_point(size=.7) +
+            labs(title = "Average distance travelled until crash across two different towns", 
+                 y="Average distance (m)", x="Frame rate (fpm)") +
+            scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) + 
+            scale_y_continuous(expand = c(0, 0), limits = c(0, max(total_summ$distance)+500))
+
+    # Create the second plot, the average time travelled until crash
+    p9 <- ggplot(total_summ, aes(x=fpm, y=game_time, col=Town)) +
+            geom_ribbon(aes(ymin = gametimeCIL, ymax = gametimeCIU, fill=Town), alpha=0.3, colour = NA) +
+            geom_line() + geom_point(size=.7) +
+            labs(title = "Average time travelled until crash across two different towns", 
+                 y="Time (s)", x="Frame rate (fpm)") +
+            scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) + 
+            scale_y_continuous(expand = c(0, 0), limits = c(0, max(total_summ$game_time)+150))
+
+  # Create the third plot, the normalised out of lane metric
+  p2 <- ggplot(total_summ, aes(x=fpm, y=offroad, col=Town)) +
+          geom_ribbon(aes(ymin = otherandoffroadCIL, ymax = otherandoffroadCIU, fill=Town), alpha=0.3, colour = NA) +
+            geom_line() + geom_point(size=.7) + 
+            labs(title = "Normalised out of lane metric across two different towns", 
+                 y="Out of lane metric", x="Frame rate (fpm)") +
+            scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+    #        scale_y_continuous(expand = c(0, 0), limits = c(0, max(total_summ$offroad)+0.3))
+
+  # Create the fourth plot, average collision intensity
+  p6 <- ggplot(total_summ, aes(x=fpm, y=collision_damage, col=Town)) +
+            geom_ribbon(aes(ymin = damageCIL, ymax = damageCIU, fill=Town), alpha=0.3, colour = NA) +
+            geom_line() + geom_point(size=.7) +
+            expand_limits(y = 0) +
+            labs(title = "Average collision intensity across two different towns", 
+                 y="Collision intensity (kg*m/s)", x="Frame rate (fpm)") +
+            scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+
+  
+  # All the fpm frame rates for the comparison of the different performance metrics
+  fpm_compare <- c(1.4, 1.8, 2.2)
+  positions <- c("1.4 fpm", "1.8 fpm", "2.2 fpm", "10 fps", "30 fps", "45 fps", "60 fps")
+  # Create the necessary columns of the dataframe for the comparison of the two methods.
+  comp_fpm_df.town1 <- summ1[is.element(summ1$fpm, fpm_compare),]
+  comp_fpm_df.town2 <- summ2[is.element(summ2$fpm, fpm_compare),]
+  compare_dists <- c(fps_town1.df$distance, comp_fpm_df.town1$distance,
+                     fps_town2.df$distance, comp_fpm_df.town2$distance)
+  compare_coll_intensity <- c(fps_town1.df$collision_damage, comp_fpm_df.town1$collision_damage,
+                     fps_town2.df$collision_damage, comp_fpm_df.town2$collision_damage)
+  compare_offroad_nonnorm1 <- c(fps_town1.df$nonnormalisedOffroad, comp_fpm_df.town1$nonnormalisedOffroad)
+  compare_offroad_nonnorm2 <- c(fps_town2.df$nonnormalisedOffroad, comp_fpm_df.town2$nonnormalisedOffroad)
+  compare_offroad1 <- compare_offroad_nonnorm1/max(compare_offroad_nonnorm1)
+  compare_offroad2 <- compare_offroad_nonnorm2/max(compare_offroad_nonnorm2)
+  compare_successful <- c(fps_town1.df$perc_finished, comp_fpm_df.town1$perc_finished,
+                     fps_town2.df$perc_finished, comp_fpm_df.town2$perc_finished)
+  compare_frames <- c(fps_town1.df$frames, comp_fpm_df.town1$frames,
+                      fps_town2.df$frames, comp_fpm_df.town2$frames)
+  compare_times <- c(fps_town1.df$game_time, comp_fpm_df.town1$game_time,
+                     fps_town2.df$game_time, comp_fpm_df.town2$game_time)
+  compare_CILs <- c(fps_town1.df$distanceCIL, comp_fpm_df.town1$distanceCIL,
+                    fps_town2.df$distanceCIL, comp_fpm_df.town2$distanceCIL)
+  compare_CIUs <- c(fps_town1.df$distanceCIU, comp_fpm_df.town1$distanceCIU,
+                    fps_town2.df$distanceCIU, comp_fpm_df.town2$distanceCIU)
+  collision_CILs <- c(fps_town1.df$damageCIL, comp_fpm_df.town1$damageCIL,
+                    fps_town2.df$damageCIL, comp_fpm_df.town2$damageCIL)
+  collision_CIUs <- c(fps_town1.df$damageCIU, comp_fpm_df.town1$damageCIU,
+                    fps_town2.df$damageCIU, comp_fpm_df.town2$damageCIU)
+  offroad_CILs <- c(c(fps_town1.df$nonnormalisedOffroadCIL,comp_fpm_df.town1$nonnormalisedOffroadCIL)/max(compare_offroad_nonnorm1),
+                    c(fps_town2.df$nonnormalisedOffroadCIL,comp_fpm_df.town2$nonnormalisedOffroadCIL)/max(compare_offroad_nonnorm2))
+  offroad_CIUs <- c(c(fps_town1.df$nonnormalisedOffroadCIU,comp_fpm_df.town1$nonnormalisedOffroadCIU)/max(compare_offroad_nonnorm1),
+                    c(fps_town2.df$nonnormalisedOffroadCIU,comp_fpm_df.town2$nonnormalisedOffroadCIU)/max(compare_offroad_nonnorm2)) 
+  successful_CILs <- c(fps_town1.df$successfulCIL, comp_fpm_df.town1$successfulCIL,
+                    fps_town2.df$successfulCIL, comp_fpm_df.town2$successfulCIL)
+  successful_CIUs <- c(fps_town1.df$successfulCIU, comp_fpm_df.town1$successfulCIU,
+                    fps_town2.df$successfulCIU, comp_fpm_df.town2$successfulCIU)
+  # Create the necessary dataframe for the comparison of the two methods.
+  compare_fps_and_fpm <- data.frame("frame_rate" = c("10 fps", "30 fps", "45 fps", "60 fps", 
+                                                     "1.4 fpm", "1.8 fpm", "2.2 fpm"), 
+                                    "travelled_distance" = round(compare_dists, digits = 2), 
+                                    "fps" = round(compare_frames/compare_times, digits = 2),
+                                    "distance_CIL" = compare_CILs, "distance_CIU" = compare_CIUs,
+                                    "Town" = c(rep("1", nrow(fps_town1.df)+length(fpm_compare)), rep("2", nrow(fps_town1.df)+length(fpm_compare))),
+                                    "collision_intensity" = round(compare_coll_intensity, digits = 2),
+                                    "offroad" = round(c(compare_offroad1,compare_offroad2), digits=2),
+                                    "successful" = round(compare_successful, digits = 3),
+                                    "collision_CIL" = collision_CILs, "collision_CIU" = collision_CIUs,
+                                    "offroad_CIL" = offroad_CILs, "offroad_CIU" = offroad_CIUs,
+                                    "successful_CIL" = successful_CILs, "successful_CIU" = successful_CIUs)
+  
+  # Create the fifth plot, a comparison of the average travelled distance between the time-based and distance-based method
+  p3 <- ggplot(compare_fps_and_fpm, aes(x=frame_rate, y=travelled_distance, fill=Town)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) +
+                geom_text(aes(label=travelled_distance), vjust=-0.3, size=3.5, position=position_dodge(.5)) +
+                labs(title = "Fpm vs. fps comparison: average travelled distance without crashing\n across two different towns",
+                     y="Average distance (m)", x="Frame rate (fpm or fps)") +
+                geom_errorbar(aes(ymax = distance_CIU, ymin = distance_CIL), width=bar_width, position=position_dodge(.5)) + scale_x_discrete(limits = positions) + geom_vline(xintercept = 3.5, lwd=1, lty=5) 
+  
+    # Create the sixth plot, a comparison of the average collision intensity between the time-based and distance-based method
+    comparison_collision <- ggplot(compare_fps_and_fpm, aes(x=frame_rate, y=collision_intensity, fill=Town)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) +
+                geom_text(aes(label=collision_intensity), vjust=-0.3, size=3.5, position=position_dodge(.5)) +
+                labs(title = "Fpm vs. fps comparison: average collision intensity\n across two different towns",
+                     y="Average collision_intensity (kg*m/s)", x="Frame rate (fpm or fps)") +
+                geom_errorbar(aes(ymax = collision_CIU, ymin = collision_CIL), width=bar_width, position=position_dodge(.5)) + scale_x_discrete(limits = positions) + geom_vline(xintercept = 3.5, lwd=1, lty=5) 
+
+      # Create the seventh plot, a comparison of the normalised out of lane metric between the time-based and distance-based method
+    offroad_comp <- ggplot(compare_fps_and_fpm, aes(x=frame_rate, y=offroad, fill=Town)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) +
+                geom_text(aes(label=offroad), vjust=-0.3, size=3.5, position=position_dodge(.5)) +
+                labs(title = "Fpm vs. fps comparison: normalised out of lane metric\n across two different towns",
+                     y="Out of lane metric", x="Frame rate (fpm or fps)")  + scale_x_discrete(limits = positions) + geom_vline(xintercept = 3.5, lwd=1, lty=5) + geom_errorbar(aes(ymax = offroad_CIU, ymin = offroad_CIL), width=bar_width, position=position_dodge(.5))
+    
+      # Create the eighth plot, a comparison of the average successful simulation runs between the time-based and distance-based method
+      successful_comp <- ggplot(compare_fps_and_fpm, aes(x=frame_rate,y=successful, fill=Town)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) + 
+                geom_text(aes(label=successful), vjust=-0.3, size=3.5, position=position_dodge(.5)) +
+              labs(title = "Fpm vs. fps comparison: average successful simulation runs\n across two different towns",
+                     y="Successful simulations (%)", x="Frame rate (fpm or fps)") +
+                  geom_errorbar(aes(ymax = successful_CIU, ymin = successful_CIL), width=bar_width, position=position_dodge(.5)) + scale_x_discrete(limits = positions) + geom_vline(xintercept = 3.5, lwd=1, lty=5) 
+  
+      # Create the nineth plot, a comparison of the average analysed frames per second between the time-based and distance-based method
+      p4 <- ggplot(compare_fps_and_fpm, aes(x=frame_rate, y=fps, fill=Town)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) +
+                geom_text(aes(label=fps), vjust=-0.3, size=3.5, position=position_dodge(.7)) +
+                labs(title = "Fpm vs. fps comparison: average analysed frames per second\n across two different towns", y="Average frame rate (fps)", x="Frame rate (fpm or fps)") + scale_x_discrete(limits = positions) + geom_vline(xintercept = 3.5, lwd=1, lty=5) 
+  
+    # Create the tenth plot, a histogram of the average percentage of simulation runs between the time-based and distance-based method
+    p10 <- ggplot(total_summ, aes(x=fpm,y=perc_finished, fill=Town)) + 
+    geom_bar(stat="identity", position=position_dodge(), width = 0.1) + 
+    labs(title = "Histogram of the average percentage of simulation runs without crashing\n across two different towns", y="Average simulations without crashing (%)", x="Frame rate (fpm)") +
+   # scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+    geom_errorbar(aes(ymax = successfulCIL, ymin = successfulCIU), width=bar_width, position=position_dodge(.1)) +
+    geom_text(aes(label=round(perc_finished, digits=2)), vjust=-0.3, size=1.8, position=position_dodge(.25)) +
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+
+  
+  #########################################
+  ############# POWER PLOTS ###############
+  #########################################
+    
+  # Convert the power benchmarks into R dataframes
+  fpmPowerAvgs <- update_power_benchmarks(2, "fpm")$powerAvgs
+  fpsPowerAvgs <- update_power_benchmarks(2, "fps")$powerAvgs
+  fpm_compare <- 1.8
+  
+  # Create the column for the power comparison between the two different methods.
+  compare_power <- c(fpmPowerAvgs[fpmPowerAvgs$frameRate==fpm_compare,]$avgPower, fpsPowerAvgs$avgPower)
+  # Create the dataframe for the power comparison between the two different methods.
+  comparePowerFR <- data.frame("frameRate" = c(paste(fpm_compare, "fpm"), "10 fps", "30 fps", "45 fps"),
+                                      "avgPower" = round(compare_power, digits = 2))
+  # Create the eleventh plot, a comparison of the average consumed power between the time-based and distance-based method
+  comparePowerPlot <- ggplot(comparePowerFR, aes(x=frameRate, y=avgPower)) + 
+                geom_bar(stat = "identity", width = 0.5, position=position_dodge()) +
+                geom_text(aes(label=avgPower), vjust=-0.3, size=3.5, position=position_dodge(.5)) +
+                labs(title = "Fpm vs. fps comparison: average consumed power (Object Detection)",
+                     y="Average power consumption (W)", x="Frame rate (fpm or fps)")
+  
+  return(list(avg_distance=p1, off_and_other=p2, fps_comparison_distance=p3, fps_comparison_fps=p4, avg_damage=p6, avg_game_time=p9, perc_finished=p10, comparePowerPlot=comparePowerPlot, collision_comp=comparison_collision, offroad_comp=offroad_comp, successful_comp=successful_comp))
+}
+```
+
+
+```{r}
+# Display the plots
+town2_plots <- create_plots()
+town2_plots$avg_distance
+town2_plots$avg_game_time
+town2_plots$avg_damage
+town2_plots$off_and_other
+town2_plots$perc_finished
+town2_plots$fps_comparison_distance
+town2_plots$collision_comp
+town2_plots$offroad_comp
+town2_plots$successful_comp
+town2_plots$fps_comparison_fps
+town2_plots$comparePowerPlot
+```
+
+
